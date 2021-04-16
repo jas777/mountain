@@ -97,6 +97,12 @@ void RenderWindow::renderCenter(float p_x, float p_y, const char *p_text, TTF_Fo
     SDL_FreeSurface(surfaceMessage);
 }
 
+void RenderWindow::renderRect(SDL_Rect *rect, SDL_Color color) {
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+    SDL_RenderFillRect(renderer, rect);
+    display();
+}
+
 void RenderWindow::display() {
     SDL_RenderPresent(renderer);
 }

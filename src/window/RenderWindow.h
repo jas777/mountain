@@ -35,6 +35,8 @@ public:
 
     void renderCenter(float p_x, float p_y, const char *p_text, TTF_Font *font, SDL_Color textColor);
 
+    void renderRect(SDL_Rect *rect, SDL_Color color);
+
     void display();
 
     void cleanUp();

@@ -4,8 +4,10 @@
 #include <ctime>
 #include <cstdlib>
 #include <random>
+#include <iostream>
 #include "window/RenderWindow.h"
 #include "window/TerminalRender.h"
+#include "event/EventHandler.h"
 
 TTF_Font *font16;
 TTF_Font *font24;
@@ -19,10 +21,18 @@ RenderWindow window = RenderWindow(SCREEN_WIDTH, SCREEN_HEIGHT);
 
 bool running;
 
-void game_loop(TerminalRender *terminal);
+void game_loop(TerminalRender &terminal);
 
-int a = 0;
-int b = 1;
+void input(TerminalRender &terminal);
+
+unsigned int frame_count;
+unsigned int timerFPS;
+unsigned int fps;
+unsigned int last_frame;
+unsigned int last_time;
+
+int cursor_tick;
+int cursor_cycle;
 
 int main(int argc, char *args[]) {
 
@@ -39,17 +49,22 @@ int main(int argc, char *args[]) {
 
     TTF_SetFontOutline(font32_outline, 3);
 
-    TerminalRender terminal_render = TerminalRender(&window, font24);
+    TerminalRender terminal_render = TerminalRender(&window, font16);
 
-    srand((unsigned) time(nullptr));
+    terminal_render.write("[#34D399] MountainOS [#CCC] - use [#6366F1] ? [#CCC] to get information about commands (or quests)", {0xCC, 0xCC, 0xCC});
+    // terminal_render.write("Line 2", {0xCC, 0xCC, 0xCC}, 1);
+
+    // SDL_Delay(3000);
+    // terminal_render.clear_line(1);
+    // terminal_render.write("Line [#2A53B1] colored part [#CCC] not colored part", { 0xCC, 0xCC, 0xCC });
 
     running = true;
 
     window.display();
 
     while (running) {
-        game_loop(&terminal_render);
-        SDL_Delay(16);
+        input(terminal_render);
+        game_loop(terminal_render);
     }
 
     window.cleanUp();
@@ -65,32 +80,56 @@ int main(int argc, char *args[]) {
     return 0;
 }
 
-Uint8 rgb_color_code() {
+//Uint8 rgb_color_code() {
+//
+//    std::random_device rd;
+//
+//    std::mt19937 mt(rd());
+//
+//    std::uniform_int_distribution<int> dist(0, 255);
+//
+//    return dist(mt);
+//
+//}
 
-    std::random_device rd;
-
-    std::mt19937 mt(rd());
-
-    std::uniform_int_distribution<int> dist(0, 255);
-
-    return dist(mt);
-
-}
-
-void game_loop(TerminalRender *terminal) {
+void input(TerminalRender &terminal) {
 
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
-
+        EventHandler::handle_event(&event, terminal, running);
     }
 
-    if (a > 60) {
-        terminal->write("Cycle - " + std::to_string(b), {rgb_color_code(), rgb_color_code(), rgb_color_code()});
-        b++;
-        a = 0;
+}
+
+void game_loop(TerminalRender &terminal) {
+
+    last_frame = SDL_GetTicks();
+
+    if (last_frame >= last_time + 1000) {
+        last_time = last_frame;
+        fps = frame_count;
+        frame_count = 0;
+    }
+
+    frame_count++;
+    timerFPS = SDL_GetTicks() - last_frame;
+
+    if (timerFPS < (1000 / 300)) {
+        SDL_Delay(1000 / 300);
+    }
+
+    terminal.refresh_cursor();
+
+    if (cursor_tick >= 140) {
+        terminal.draw_cursor(true);
+        if (cursor_tick >= 280) {
+            cursor_tick = 0;
+        }
     } else {
-        a++;
+        terminal.draw_cursor(false);
     }
+
+    cursor_tick++;
 
 }

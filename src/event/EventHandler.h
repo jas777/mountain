@@ -6,8 +6,12 @@
 #define MOUNTAIN_EVENTHANDLER_H
 
 
-class EventHandler {
+#include <SDL.h>
+#include "../window/TerminalRender.h"
 
+class EventHandler {
+public:
+    static void handle_event(SDL_Event *event, TerminalRender& terminal, bool& running);
 };
 
 
