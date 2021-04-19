@@ -18,21 +18,20 @@ void EventHandler::handle_event(SDL_Event *event, TerminalRender &terminal, bool
             if (!(SDL_GetModState() & KMOD_CTRL &&
                   (event->text.text[0] == 'c' || event->text.text[0] == 'C' || event->text.text[0] == 'v' ||
                    event->text.text[0] == 'V'))) {
-                terminal.input += event->text.text;
-                terminal.force_cursor_update();
+                terminal.input_add(event->text.text);
             } else if (event->key.keysym.sym == SDLK_c && SDL_GetModState() & KMOD_CTRL) {
                 SDL_SetClipboardText(terminal.get_input().c_str());
             } else if (event->key.keysym.sym == SDLK_v && SDL_GetModState() & KMOD_CTRL) {
-                terminal.input += SDL_GetClipboardText();
-                terminal.force_cursor_update();
+                terminal.input_add(SDL_GetClipboardText());
             }
 
             break;
 
         case SDL_KEYDOWN:
-            if (event->key.keysym.sym == SDLK_BACKSPACE && !terminal.input.empty()) {
-                terminal.input.pop_back();
-                terminal.force_cursor_update();
+            std::string input = terminal.get_input();
+            if (event->key.keysym.sym == SDLK_BACKSPACE && !input.empty()) {
+                input.pop_back();
+                terminal.input_set(input);
             }
             break;
 

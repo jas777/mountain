@@ -1,50 +1,143 @@
 //
-// Created by User on 15.04.2021.
+// Created by User on 18.04.2021.
 //
 
-#include <iostream>
+#include <regex>
 #include <string>
 #include <sstream>
-#include <regex>
-#include <utility>
+#include <iostream>
+#include <cmath>
 #include "TerminalRender.h"
-#include "RenderWindow.h"
 
-TerminalRender::TerminalRender(RenderWindow *window, TTF_Font *font) {
+TerminalRender::TerminalRender(RenderWindow *window, TTF_Font *font, SDL_Color default_color) {
+
     this->window = window;
     this->font = font;
+    this->default_color = default_color;
 
-    TTF_SizeText(font, "A", nullptr, &this->line_height);
+    TTF_SizeText(font, "A", &this->char_size, &this->line_height);
+    this->line_height += 3;
 
-    this->lines = (this->window->height - 20) / (this->line_height + 3);
+    // (Assuming the font is monospaced)
 
-    for (int i = 0; i < this->lines; i++) {
-        this->linebuf.emplace_back("");
+    this->cols = (window->width - 16) / this->char_size;
+    this->lines = (window->height - 16) / this->line_height;
+
+}
+
+// Input
+
+void TerminalRender::input_add(std::string text) {
+
+}
+
+void TerminalRender::input_set(std::string text) {
+
+}
+
+std::string TerminalRender::get_input() {
+    return this->input_raw;
+}
+
+// Text rendering
+
+void TerminalRender::write(const std::string &text) {
+
+    if (this->current_line + calc_lines(text) > this->lines) {
+        this->shift();
+        this->current_line = -1;
+    }
+
+    write(text, this->current_line++);
+
+}
+
+void TerminalRender::write(const std::string &text, int line) {
+
+    std::vector<LineData> parsed_text = parse_text(text);
+
+    for (int i = 0; i < parsed_text.size(); i++) {
+
+        int x_offset = 10;
+        int y_offset = (((line + 1) + i) * this->line_height) + 10;
+
+        LineData data = parsed_text[i];
+
+        for (int j = 0; j < data.parts.size(); j++) {
+
+            if (data.parts[j].empty()) continue;
+
+            int w = 0;
+            TTF_SizeText(this->font, data.parts[j].c_str(), &w, nullptr);
+
+            this->window->render((float) x_offset, (float) y_offset, data.parts[j].c_str(),
+                                 this->font, data.part_colors[j]);
+
+            x_offset += w;
+
+        }
+
     }
 
 }
 
-void TerminalRender::write(const std::string &text, SDL_Color color, bool save_buf) {
+void TerminalRender::clear_line(int line) {
 
-    if (this->lines < this->next_line + 1) {
-        this->clear();
-        this->next_line = 0;
+}
+
+void TerminalRender::clear() {
+
+}
+
+void TerminalRender::refresh() {
+
+}
+
+// Text utilities
+
+std::string TerminalRender::strip_colors(std::string text) {
+
+    std::regex::flag_type regex_flag = std::regex_constants::icase | std::regex_constants::ECMAScript;
+
+    std::regex regexp("\\[((?:#)[0-9a-f]{8}|(?:#)[0-9a-f]{6}|(?:#)[0-9a-f]{4}|(?:#)[0-9a-f]{3})\\]", regex_flag);
+
+    std::smatch matches;
+
+    std::regex_search(text, matches, regexp);
+
+    std::istringstream iss(text);
+    std::string s;
+
+    int curr_part = 0;
+
+    std::string string_from_parts;
+
+    while (getline(iss, s, ' ')) {
+        if (s.empty()) continue;
+        if (std::regex_match(s, matches, regexp)) {
+
+            curr_part++;
+
+            std::regex pattern("#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})");
+
+            s.replace(0, 1, "").replace(s.length() - 2, 1, "");
+
+            std::smatch match;
+
+            continue;
+
+        }
+
+        string_from_parts += s + " ";
+
     }
 
-    write(text, color, this->next_line, save_buf);
-    this->next_line++;
-    this->input_line++;
+    string_from_parts.pop_back();
+    return string_from_parts;
+
 }
 
-void TerminalRender::write(const std::string &text, SDL_Color color) {
-    write(text, color, true);
-}
-
-void TerminalRender::write(const std::string &text, SDL_Color color, int line, bool save_buf) {
-
-    int w, h;
-
-    float y = (float) (line + 1) * ((float) this->line_height + 3);
+std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
     std::regex::flag_type regex_flag = std::regex_constants::icase | std::regex_constants::ECMAScript;
 
@@ -63,10 +156,12 @@ void TerminalRender::write(const std::string &text, SDL_Color color, int line, b
     int curr_part = 0;
 
     string_parts.emplace_back();
-    colors.emplace_back(color);
+    colors.emplace_back(this->default_color);
 
     while (getline(iss, s, ' ')) {
+
         if (s.empty()) continue;
+
         if (std::regex_match(s, matches, regexp)) {
 
             // std::cout << s << std::endl;
@@ -82,8 +177,7 @@ void TerminalRender::write(const std::string &text, SDL_Color color, int line, b
 
             std::smatch match;
 
-            if (std::regex_match(s, match, pattern))
-            {
+            if (std::regex_match(s, match, pattern)) {
 
                 Uint8 r = std::stoul(match[1].str(), nullptr, 16);
                 Uint8 g = std::stoul(match[2].str(), nullptr, 16);
@@ -93,108 +187,89 @@ void TerminalRender::write(const std::string &text, SDL_Color color, int line, b
                 continue;
             }
 
-            colors[curr_part] = { 0xCC, 0xCC, 0xCC };
+            colors[curr_part] = this->default_color;
 
             continue;
 
         }
+
         string_parts[curr_part] += s + " ";
+
     }
 
-    int x_add = 0;
+    string_parts[curr_part].pop_back();
+
+    std::vector<LineData> line_data;
+
+    unsigned int len = 0;
+
+    // Dividing parts into lines
+
+    std::string stripped = strip_colors(text);
+
+    if (calc_lines(stripped) == 1) {
+        line_data.emplace_back(LineData{
+                text,
+                string_parts,
+                colors
+        });
+        return line_data;
+    }
+
+    std::cout << "a";
+
+    int line_index = 0;
 
     for (int i = 0; i < string_parts.size(); i++) {
 
-        if (i > 0) {
+        std::string part = string_parts[i];
+        SDL_Color part_color = colors[i];
 
-            int part_w = 0;
-            TTF_SizeText(font, (string_parts[i - 1]).c_str(), &part_w, nullptr);
+        line_data.emplace_back();
 
-            x_add += part_w;
+        if (len + part.length() - (string_parts.size() == 1 ? 0 : 1) > this->cols) {
+
+            while (len + part.length() - (string_parts.size() == 1 ? 0 : 1) > this->cols) {
+
+                line_data.emplace_back();
+                line_data[line_index].parts.emplace_back(part.substr(0, this->cols - len - 1));
+                line_data[line_index].part_colors.emplace_back(part_color);
+                part.replace(0, this->cols - len, "");
+
+                len = 0;
+                line_index++;
+
+            }
 
         }
 
-        if (string_parts[i].empty()) continue;
-
-        this->window->render(10 + x_add, y, (string_parts[i]).c_str(),
-                             this->font, colors[i]);
-
-    }
-
-    if (save_buf) {
-        for (const auto &str : string_parts) {
-            this->linebuf[line] += str + (string_parts.size() > 1 ? " " : "");
+        if (!part.empty()) {
+            line_data[line_index].parts.emplace_back(part);
+            line_data[line_index].part_colors.emplace_back(part_color);
         }
+
+        len += part.length();
+
     }
 
-    this->window->display();
+    return line_data;
 
 }
 
-void TerminalRender::write(const std::string &text, SDL_Color color, int line) {
-    write(text, color, line, true);
-}
-
-void TerminalRender::clear() {
-    this->window->clear();
-}
-
-void TerminalRender::clear_line(int line) {
-
-    int h = 0;
-
-    TTF_SizeText(this->font, "A", nullptr, &h);
-
-    int x = 10;
-    float y = (float) (line + 1) * ((float) this->line_height + 3);
-
-    SDL_Rect rect;
-
-    rect.x = x;
-    rect.y = y;
-
-    rect.w = this->window->width;
-    rect.h = h;
-
-    this->linebuf[line] = "";
-
-    this->window->renderRect(&rect, {0x0, 0x0, 0x0});
-    this->window->display();
-
-}
-
-void TerminalRender::input_set(std::string& text) {
-
-}
-
-std::string TerminalRender::get_input() {
-    return std::string();
-}
-
-void TerminalRender::draw_cursor(bool show) {
-    draw_cursor(show, false);
-}
+// Cursor
 
 void TerminalRender::draw_cursor(bool show, bool force_update) {
-
-    if (show) {
-        if (cursor_shown && !force_update) return;
-        cursor_shown = true;
-        this->clear_line(this->input_line);
-        write(this->current_path + " " + this->input + "_", { 0xCC, 0xCC, 0xCC }, this->input_line, false);
-    } else {
-        if (!cursor_shown && !force_update) return;
-        cursor_shown = false;
-        this->clear_line(this->input_line);
-        write(this->current_path + " " + this->input, { 0xCC, 0xCC, 0xCC }, this->input_line, false);
-    }
-
+    return;
 }
 
-void TerminalRender::refresh_cursor() {
-    this->draw_cursor(this->cursor_shown);
+// Line utilities
+
+unsigned int TerminalRender::calc_lines(const std::string &text) const {
+    return std::ceil((float) text.length() / (float) this->cols);
 }
 
-void TerminalRender::force_cursor_update() {
-    draw_cursor(this->cursor_shown, true);
+bool TerminalRender::too_long(const std::string &text) {
+    return text.length() > this->cols;
 }
+
+void TerminalRender::shift() {}

@@ -10,6 +10,7 @@
 #include "event/EventHandler.h"
 
 TTF_Font *font16;
+TTF_Font *font20;
 TTF_Font *font24;
 TTF_Font *font32;
 TTF_Font *font32_outline;
@@ -42,16 +43,21 @@ int main(int argc, char *args[]) {
 
     window.create("Mountain - the game", 1280, 720);
 
-    font16 = TTF_OpenFont("res/ttf/ModeSeven.TTF", 16);
-    font24 = TTF_OpenFont("res/ttf/ModeSeven.TTF", 24);
-    font32 = TTF_OpenFont("res/ttf/ModeSeven.TTF", 32);
-    font32_outline = TTF_OpenFont("res/ttf/ModeSeven.TTF", 32);
+    font16 = TTF_OpenFont("res/ttf/inconsolata.ttf", 16);
+    font20 = TTF_OpenFont("res/ttf/inconsolata.ttf", 20);
+    font24 = TTF_OpenFont("res/ttf/inconsolata.ttf", 24);
+    font32 = TTF_OpenFont("res/ttf/inconsolata.ttf", 32);
+    font32_outline = TTF_OpenFont("res/ttf/inconsolata.ttf", 32);
 
     TTF_SetFontOutline(font32_outline, 3);
 
-    TerminalRender terminal_render = TerminalRender(&window, font16);
+    TerminalRender terminal_render = TerminalRender(&window, font16, {0xCC, 0xCC, 0xCC});
 
-    terminal_render.write("[#34D399] MountainOS [#CCC] - use [#6366F1] ? [#CCC] to get information about commands (or quests)", {0xCC, 0xCC, 0xCC});
+    terminal_render.write(
+            "[#34D399] MountainOS [#CCC] - use [#6366F1] ? [#CCC] to get information about commands (or quests)");
+    terminal_render.write(
+            "Lorem ipsum dolor sit amet, consectetur adipiscing [#FF5500] elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Morbi tincidunt augue interdum velit euismod in. Risus sed vulputate odio ut. Amet risus nullam eget felis eget nunc lobortis mattis aliquam. Velit sed ullamcorper morbi tincidunt ornare. Blandit cursus risus at ultrices mi tempus imperdiet nulla. Venenatis lectus magna fringilla urna porttitor rhoncus dolor. Malesuada pellentesque elit eget gravida cum. Morbi tristique senectus et netus. Ut porttitor leo a diam sollicitudin tempor id. Blandit turpis cursus in hac habitasse. Leo vel orci porta non pulvinar neque laoreet suspendisse interdum. Magna sit amet purus gravida quis. Mauris ultrices eros in cursus turpis massa."
+            "Et egestas quis ipsum suspendisse ultrices gravida dictum fusce. Nunc mi ipsum faucibus vitae aliquet nec [#CCC] ullamcorper sit amet. Accumsan sit amet nulla facilisi morbi tempus iaculis. Donec ultrices tincidunt arcu non sodales neque sodales. Eros in cursus turpis massa tincidunt dui ut ornare. Ipsum suspendisse ultrices gravida dictum fusce. Nec feugiat nisl pretium fusce id velit ut. Eu sem integer vitae justo. Suscipit tellus mauris a diam maecenas sed enim ut. Maecenas accumsan lacus vel facilisis volutpat est. Eu lobortis elementum nibh tellus molestie nunc non blandit massa. Turpis egestas integer eget aliquet nibh praesent tristique. Pellentesque id nibh tortor id aliquet lectus proin.");
     // terminal_render.write("Line 2", {0xCC, 0xCC, 0xCC}, 1);
 
     // SDL_Delay(3000);
@@ -115,19 +121,20 @@ void game_loop(TerminalRender &terminal) {
     frame_count++;
     timerFPS = SDL_GetTicks() - last_frame;
 
-    if (timerFPS < (1000 / 300)) {
-        SDL_Delay(1000 / 300);
+    if (timerFPS < (1000 / 60)) {
+        SDL_Delay(1000 / 60);
     }
 
-    terminal.refresh_cursor();
+    if (cursor_tick == 30) {
+        terminal.draw_cursor(true, false);
+    }
 
-    if (cursor_tick >= 140) {
-        terminal.draw_cursor(true);
-        if (cursor_tick >= 280) {
-            cursor_tick = 0;
-        }
-    } else {
-        terminal.draw_cursor(false);
+    if (cursor_tick >= 60) {
+        cursor_tick = 0;
+    }
+
+    if (cursor_tick < 30) {
+        terminal.draw_cursor(false, false);
     }
 
     cursor_tick++;
