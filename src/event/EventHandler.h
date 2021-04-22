@@ -8,10 +8,13 @@
 
 #include <SDL.h>
 #include "../window/TerminalRender.h"
+#include "../input/InputHandler.h"
 
 class EventHandler {
+private:
+    InputHandler input_handler;
 public:
-    static void handle_event(SDL_Event *event, TerminalRender& terminal, bool& running);
+    void handle_event(SDL_Event *event, TerminalRender *terminal, bool& running);
 };
 
 

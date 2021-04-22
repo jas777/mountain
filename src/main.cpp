@@ -20,6 +20,8 @@ const int SCREEN_HEIGHT = 720;
 
 RenderWindow window = RenderWindow(SCREEN_WIDTH, SCREEN_HEIGHT);
 
+EventHandler event_handler;
+
 bool running;
 
 void game_loop(TerminalRender &terminal);
@@ -103,7 +105,7 @@ void input(TerminalRender &terminal) {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
-        EventHandler::handle_event(&event, terminal, running);
+        event_handler.handle_event(&event, &terminal, running);
     }
 
 }

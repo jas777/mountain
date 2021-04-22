@@ -18,8 +18,8 @@ struct LineData {
 };
 
 struct Cursor {
-    int x;
-    int y;
+    unsigned int x = 0;
+    unsigned int y = 0;
 };
 
 class TerminalRender {
@@ -31,7 +31,7 @@ private:
     TTF_Font *font;
     std::vector<LineData> line_buffer;
     std::string input_raw;
-    std::string current_path;
+    std::string current_path = "some/debug/path";
 
     SDL_Color default_color;
 
@@ -43,11 +43,15 @@ private:
     int lines;
     int cols;
 
+    bool cursor_shown = false;
+
 public:
 
     TerminalRender(RenderWindow *window, TTF_Font *font, SDL_Color default_color);
 
     // Input
+
+    void input_submit();
 
     void input_add(std::string text);
 
@@ -59,7 +63,7 @@ public:
 
     void write(const std::string &text);
 
-    void write(const std::string &text, int line);
+    void write(const std::string &text, int line, bool cursor_follow);
 
     void clear_line(int line);
 
@@ -70,6 +74,8 @@ public:
     // Cursor
 
     void draw_cursor(bool show, bool force_update);
+
+    void move_cursor(unsigned int x, unsigned int y);
 
     // Text utilities
 

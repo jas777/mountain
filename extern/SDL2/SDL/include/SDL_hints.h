@@ -259,7 +259,7 @@ extern "C" {
  *  \brief  A variable controlling whether the window frame and title bar are interactive when the cursor is hidden 
  *
  *  This variable can be set to the following values:
- *    "0"       - The window frame is not interactive when the cursor is hidden (no move, resize, etc)
+ *    "0"       - The window frame is not interactive when the cursor is hidden (no move_cursor, resize, etc)
  *    "1"       - The window frame is interactive when the cursor is hidden
  *
  *  By default SDL will allow interaction with the window frame when the cursor is hidden

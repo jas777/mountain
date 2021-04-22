@@ -123,7 +123,7 @@ extern DECLSPEC Uint32 SDLCALL SDL_GetRelativeMouseState(int *x, int *y);
 /**
  *  \brief Moves the mouse to the given position within the window.
  *
- *  \param window The window to move the mouse into, or NULL for the current mouse focus
+ *  \param window The window to move_cursor the mouse into, or NULL for the current mouse focus
  *  \param x The x coordinate within the window
  *  \param y The y coordinate within the window
  *

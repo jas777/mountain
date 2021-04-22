@@ -7,6 +7,7 @@
 #include <sstream>
 #include <iostream>
 #include <cmath>
+#include <utility>
 #include "TerminalRender.h"
 
 TerminalRender::TerminalRender(RenderWindow *window, TTF_Font *font, SDL_Color default_color) {
@@ -23,16 +24,30 @@ TerminalRender::TerminalRender(RenderWindow *window, TTF_Font *font, SDL_Color d
     this->cols = (window->width - 16) / this->char_size;
     this->lines = (window->height - 16) / this->line_height;
 
+    for (int i = 0; i < this->lines; i++) {
+        this->line_buffer.emplace_back();
+    }
+
 }
 
 // Input
 
+void TerminalRender::input_submit() {
+
+    this->move_cursor(0, ++current_line + 1);
+    this->input_raw = "";
+}
+
 void TerminalRender::input_add(std::string text) {
+
+    this->input_raw += text;
+    this->write(this->input_raw, this->current_line + 1, true);
 
 }
 
 void TerminalRender::input_set(std::string text) {
-
+    this->input_raw = std::move(text);
+    this->write(this->input_raw, this->current_line + 1, true);
 }
 
 std::string TerminalRender::get_input() {
@@ -43,45 +58,77 @@ std::string TerminalRender::get_input() {
 
 void TerminalRender::write(const std::string &text) {
 
-    if (this->current_line + calc_lines(text) > this->lines) {
+    unsigned int lines_taken = calc_lines(text);
+
+    if (this->current_line + lines_taken > this->lines) {
         this->shift();
         this->current_line = -1;
     }
 
-    write(text, this->current_line++);
+    write(text, ++this->current_line, false);
+
+    this->current_line += (signed) lines_taken - 1;
+
+    this->cursor.y = current_line + 1;
+    this->cursor.x = this->line_buffer[current_line + 1].content_raw.length() == 0 ? 0 :
+                     this->line_buffer[current_line + 1].content_raw.length() + 1;
 
 }
 
-void TerminalRender::write(const std::string &text, int line) {
+void TerminalRender::write(const std::string &text, int line, bool cursor_follow) {
+
+    clear_line(line);
 
     std::vector<LineData> parsed_text = parse_text(text);
 
     for (int i = 0; i < parsed_text.size(); i++) {
 
-        int x_offset = 10;
-        int y_offset = (((line + 1) + i) * this->line_height) + 10;
+        unsigned int x_offset = 10;
+        unsigned int y_offset = ((line + i) * this->line_height) + 10;
 
         LineData data = parsed_text[i];
+
+        this->line_buffer[line + i] = data;
 
         for (int j = 0; j < data.parts.size(); j++) {
 
             if (data.parts[j].empty()) continue;
 
-            int w = 0;
-            TTF_SizeText(this->font, data.parts[j].c_str(), &w, nullptr);
-
             this->window->render((float) x_offset, (float) y_offset, data.parts[j].c_str(),
                                  this->font, data.part_colors[j]);
 
-            x_offset += w;
+            x_offset += data.parts[j].length() * this->char_size;
 
         }
 
     }
 
+    if (cursor_follow) {
+        this->cursor.x = this->line_buffer[line + parsed_text.size() - 1].content_raw.length();
+        this->cursor.y = line + parsed_text.size() - 1;
+    }
+
+    this->window->display();
+
 }
 
 void TerminalRender::clear_line(int line) {
+
+    if (line >= this->lines) return;
+
+    int x = 10;
+    int y = 10 + (line_height * line);
+
+    SDL_Rect rect;
+
+    rect.x = x;
+    rect.y = y;
+    rect.w = window->width;
+    rect.h = this->line_height - 3;
+
+    this->window->renderRect(&rect, {0x0, 0x0, 0x0});
+
+    line_buffer[line] = LineData{};
 
 }
 
@@ -96,6 +143,8 @@ void TerminalRender::refresh() {
 // Text utilities
 
 std::string TerminalRender::strip_colors(std::string text) {
+
+    if (text.empty()) return "";
 
     std::regex::flag_type regex_flag = std::regex_constants::icase | std::regex_constants::ECMAScript;
 
@@ -113,8 +162,8 @@ std::string TerminalRender::strip_colors(std::string text) {
     std::string string_from_parts;
 
     while (getline(iss, s, ' ')) {
-        if (s.empty()) continue;
-        if (std::regex_match(s, matches, regexp)) {
+
+        if (!s.empty() && std::regex_match(s, matches, regexp)) {
 
             curr_part++;
 
@@ -132,7 +181,10 @@ std::string TerminalRender::strip_colors(std::string text) {
 
     }
 
-    string_from_parts.pop_back();
+    if (text[text.length() - 1] == ' ') string_from_parts += " ";
+
+    if (!string_from_parts.empty()) string_from_parts.pop_back();
+
     return string_from_parts;
 
 }
@@ -160,9 +212,7 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
     while (getline(iss, s, ' ')) {
 
-        if (s.empty()) continue;
-
-        if (std::regex_match(s, matches, regexp)) {
+        if (!s.empty() && std::regex_match(s, matches, regexp)) {
 
             // std::cout << s << std::endl;
 
@@ -197,7 +247,11 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
     }
 
-    string_parts[curr_part].pop_back();
+    if (string_parts[curr_part].empty() ||
+        string_parts[curr_part][string_parts[curr_part].length() - 1] == ' ')
+        string_parts[curr_part] += " ";
+
+    if (!string_parts[curr_part].empty()) string_parts[curr_part].pop_back();
 
     std::vector<LineData> line_data;
 
@@ -209,14 +263,12 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
     if (calc_lines(stripped) == 1) {
         line_data.emplace_back(LineData{
-                text,
+                stripped,
                 string_parts,
                 colors
         });
         return line_data;
     }
-
-    std::cout << "a";
 
     int line_index = 0;
 
@@ -232,8 +284,13 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
             while (len + part.length() - (string_parts.size() == 1 ? 0 : 1) > this->cols) {
 
                 line_data.emplace_back();
-                line_data[line_index].parts.emplace_back(part.substr(0, this->cols - len - 1));
+
+                std::string sub = part.substr(0, this->cols - len - 1);
+
+                line_data[line_index].parts.emplace_back(sub);
                 line_data[line_index].part_colors.emplace_back(part_color);
+                line_data[line_index].content_raw += sub;
+
                 part.replace(0, this->cols - len, "");
 
                 len = 0;
@@ -258,8 +315,69 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
 // Cursor
 
+void TerminalRender::move_cursor(unsigned int x, unsigned int y) {
+
+    unsigned int old_pos_x = 10 + (this->cursor.x * this->char_size);
+    unsigned int old_pos_y = 10 + (line_height * this->cursor.y);
+
+    cursor.x = x;
+    cursor.y = y;
+
+    SDL_Rect rect;
+
+    rect.x = (signed) old_pos_x;
+    rect.y = (signed) old_pos_y;
+    rect.w = char_size;
+    rect.h = this->line_height - 3;
+
+    this->window->renderRect(&rect, {0x0, 0x0, 0x0});
+
+    this->window->display();
+
+}
+
 void TerminalRender::draw_cursor(bool show, bool force_update) {
-    return;
+
+    int x = 10 + (cursor.x * this->char_size);
+    int y = 10 + (line_height * cursor.y);
+
+    SDL_Rect rect;
+
+    rect.x = x;
+    rect.y = y;
+    rect.w = char_size;
+    rect.h = this->line_height - 3;
+
+    if (show) {
+
+        if (this->cursor_shown == show && !force_update) return;
+
+        this->window->renderRect(&rect, {0x0, 0x0, 0x0});
+
+        this->window->render((float) x, (float) y, this->line_buffer[cursor.y].content_raw.length() > cursor.x ?
+                                                   this->line_buffer[cursor.y].content_raw.substr(cursor.x, 1).c_str() :
+                                                   " ", this->font, this->default_color);
+
+        this->window->render((float) x, (float) y, "_", this->font, this->default_color);
+
+        this->cursor_shown = true;
+
+    } else {
+
+        if (this->cursor_shown == show && !force_update) return;
+
+        this->window->renderRect(&rect, {0x0, 0x0, 0x0});
+
+        this->window->render((float) x, (float) y, this->line_buffer[cursor.y].content_raw.length() > cursor.x
+                                                   ? this->line_buffer[cursor.y].content_raw.substr(cursor.x, 1).c_str()
+                                                   : " ", this->font, this->default_color);
+
+        this->cursor_shown = false;
+
+    }
+
+    this->window->display();
+
 }
 
 // Line utilities
