@@ -34,20 +34,41 @@ TerminalRender::TerminalRender(RenderWindow *window, TTF_Font *font, SDL_Color d
 
 void TerminalRender::input_submit() {
 
-    this->move_cursor(0, ++current_line + 1);
+    if (this->input_raw.empty()) return;
+
+    this->current_line += calc_lines(strip_colors(this->input_raw));
+
+    this->move_cursor(0, current_line + 1);
     this->input_raw = "";
 }
 
 void TerminalRender::input_add(std::string text) {
 
+    input_change(this->input_raw + text, this->input_raw);
     this->input_raw += text;
     this->write(this->input_raw, this->current_line + 1, true);
 
 }
 
 void TerminalRender::input_set(std::string text) {
+
+    input_change(text, this->input_raw);
     this->input_raw = std::move(text);
     this->write(this->input_raw, this->current_line + 1, true);
+
+}
+
+void TerminalRender::input_change(const std::string& new_input, const std::string& old_input) {
+
+    unsigned int new_lines = calc_lines(strip_colors(new_input));
+    unsigned int old_lines = calc_lines(strip_colors(old_input));
+
+    if (new_lines < old_lines) {
+        for (int i = 1; i <= old_lines - new_lines; i++) {
+            clear_line(this->current_line + 1 + i);
+        }
+    }
+
 }
 
 std::string TerminalRender::get_input() {
@@ -58,7 +79,7 @@ std::string TerminalRender::get_input() {
 
 void TerminalRender::write(const std::string &text) {
 
-    unsigned int lines_taken = calc_lines(text);
+    unsigned int lines_taken = calc_lines(strip_colors(text));
 
     if (this->current_line + lines_taken > this->lines) {
         this->shift();
@@ -77,7 +98,11 @@ void TerminalRender::write(const std::string &text) {
 
 void TerminalRender::write(const std::string &text, int line, bool cursor_follow) {
 
-    clear_line(line);
+    int line_count = calc_lines(strip_colors(text));
+
+    for (int i = 0; i < line_count; i++) {
+        clear_line(line + i);
+    }
 
     std::vector<LineData> parsed_text = parse_text(text);
 
@@ -104,8 +129,8 @@ void TerminalRender::write(const std::string &text, int line, bool cursor_follow
     }
 
     if (cursor_follow) {
-        this->cursor.x = this->line_buffer[line + parsed_text.size() - 1].content_raw.length();
-        this->cursor.y = line + parsed_text.size() - 1;
+        this->cursor.x = this->line_buffer[line + line_count - 1].content_raw.length();
+        this->cursor.y = line + line_count - 1;
     }
 
     this->window->display();
@@ -248,7 +273,7 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
     }
 
     if (string_parts[curr_part].empty() ||
-        string_parts[curr_part][string_parts[curr_part].length() - 1] == ' ')
+        string_parts[curr_part][string_parts[curr_part].length() - 2] == ' ')
         string_parts[curr_part] += " ";
 
     if (!string_parts[curr_part].empty()) string_parts[curr_part].pop_back();
@@ -279,13 +304,13 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
         line_data.emplace_back();
 
-        if (len + part.length() - (string_parts.size() == 1 ? 0 : 1) > this->cols) {
+        if (len + part.length() > this->cols) {
 
-            while (len + part.length() - (string_parts.size() == 1 ? 0 : 1) > this->cols) {
+            while (len + part.length() > this->cols) {
 
                 line_data.emplace_back();
 
-                std::string sub = part.substr(0, this->cols - len - 1);
+                std::string sub = part.substr(0, this->cols - len);
 
                 line_data[line_index].parts.emplace_back(sub);
                 line_data[line_index].part_colors.emplace_back(part_color);
@@ -301,6 +326,8 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
         }
 
         if (!part.empty()) {
+            std::cout << strip_colors(part) << std::endl;
+            line_data[line_index].content_raw += strip_colors(part);
             line_data[line_index].parts.emplace_back(part);
             line_data[line_index].part_colors.emplace_back(part_color);
         }
@@ -354,9 +381,9 @@ void TerminalRender::draw_cursor(bool show, bool force_update) {
 
         this->window->renderRect(&rect, {0x0, 0x0, 0x0});
 
-        this->window->render((float) x, (float) y, this->line_buffer[cursor.y].content_raw.length() > cursor.x ?
-                                                   this->line_buffer[cursor.y].content_raw.substr(cursor.x, 1).c_str() :
-                                                   " ", this->font, this->default_color);
+//        this->window->render((float) x, (float) y, this->line_buffer[cursor.y].content_raw.length() > cursor.x ?
+//                                                   this->line_buffer[cursor.y].content_raw.substr(cursor.x, 1).c_str() :
+//                                                   " ", this->font, this->default_color);
 
         this->window->render((float) x, (float) y, "_", this->font, this->default_color);
 

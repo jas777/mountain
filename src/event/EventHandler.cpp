@@ -37,7 +37,9 @@ void EventHandler::handle_event(SDL_Event *event, TerminalRender *terminal, bool
                     terminal->input_set(input);
                     break;
                 case SDLK_RETURN:
-                    this->input_handler.handle_input(terminal->get_input(), terminal);
+                    if (!terminal->get_input().empty()) {
+                        this->input_handler.handle_input(terminal->get_input(), terminal);
+                    }
                     terminal->input_submit();
                     break;
             }

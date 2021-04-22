@@ -3,10 +3,22 @@
 //
 
 #include <iostream>
+#include <fstream>
+#include <nlohmann/json.hpp>
 #include "InputHandler.h"
 
 void InputHandler::handle_input(std::string input, TerminalRender *terminal) {
 
-    std::cout << TerminalRender::strip_colors(input) << std::endl;
+//    std::ifstream input_file("res/quest.json");
+//
+//    if (!input_file.is_open()) {
+//        std::cerr << "Could not open the file - '"
+//             << "res/quest.json" << "'" << std::endl;
+//        exit(EXIT_FAILURE);
+//    }
+//
+//    auto j3 = nlohmann::json::parse(std::string((std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()));
+
+    std::cout << TerminalRender::strip_colors(j3.dump()) << std::endl;
 
 }

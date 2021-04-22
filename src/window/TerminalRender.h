@@ -57,6 +57,8 @@ public:
 
     void input_set(std::string text);
 
+    void input_change(const std::string& new_input, const std::string& old_input);
+
     std::string get_input();
 
     // Text rendering
