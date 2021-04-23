@@ -10,7 +10,7 @@
 
 class Player {
 
-    std::string name;
+    std::u8string name;
 
 };
 

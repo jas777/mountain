@@ -7,7 +7,7 @@
 #include <nlohmann/json.hpp>
 #include "InputHandler.h"
 
-void InputHandler::handle_input(std::string input, TerminalRender *terminal) {
+void InputHandler::handle_input(std::u8string input, TerminalRender *terminal) {
 
 //    std::ifstream input_file("res/quest.json");
 //
@@ -17,8 +17,8 @@ void InputHandler::handle_input(std::string input, TerminalRender *terminal) {
 //        exit(EXIT_FAILURE);
 //    }
 //
-//    auto j3 = nlohmann::json::parse(std::string((std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()));
+//    auto j3 = nlohmann::json::parse(std::u8string((std::istreambuf_iterator<char>(input_file)), std::istreambuf_iterator<char>()));
 
-    std::cout << TerminalRender::strip_colors(j3.dump()) << std::endl;
+//    std::cout << TerminalRender::strip_colors(j3.dump()) << std::endl;
 
 }

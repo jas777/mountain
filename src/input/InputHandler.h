@@ -10,7 +10,7 @@
 
 class InputHandler {
 public:
-    void handle_input(std::string input, TerminalRender *terminal);
+    void handle_input(std::u8string input, TerminalRender *terminal);
 };
 
 

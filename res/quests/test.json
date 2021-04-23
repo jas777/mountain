@@ -1,0 +1,13 @@
+{
+  "name": "Test quest",
+  "description": "To complete this quest you must find a hidden code",
+  "answer": "tajny kod 2000",
+  "directories": ["folder"],
+  "files": [
+    {
+      "path": "folder",
+      "name": "plik.txt",
+      "content": "tajny kod 2000"
+    }
+  ]
+}

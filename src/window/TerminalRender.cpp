@@ -9,6 +9,7 @@
 #include <cmath>
 #include <utility>
 #include "TerminalRender.h"
+#include "utf8.h"
 
 TerminalRender::TerminalRender(RenderWindow *window, TTF_Font *font, SDL_Color default_color) {
 
@@ -39,10 +40,10 @@ void TerminalRender::input_submit() {
     this->current_line += calc_lines(strip_colors(this->input_raw));
 
     this->move_cursor(0, current_line + 1);
-    this->input_raw = "";
+    this->input_raw = u8"";
 }
 
-void TerminalRender::input_add(std::string text) {
+void TerminalRender::input_add(std::u8string text) {
 
     input_change(this->input_raw + text, this->input_raw);
     this->input_raw += text;
@@ -50,15 +51,15 @@ void TerminalRender::input_add(std::string text) {
 
 }
 
-void TerminalRender::input_set(std::string text) {
+void TerminalRender::input_set(std::u8string text) {
 
     input_change(text, this->input_raw);
-    this->input_raw = std::move(text);
+    this->input_raw = text_length(text) == 0 ? u8"" : std::move(text);
     this->write(this->input_raw, this->current_line + 1, true);
 
 }
 
-void TerminalRender::input_change(const std::string& new_input, const std::string& old_input) {
+void TerminalRender::input_change(const std::u8string &new_input, const std::u8string &old_input) {
 
     unsigned int new_lines = calc_lines(strip_colors(new_input));
     unsigned int old_lines = calc_lines(strip_colors(old_input));
@@ -71,13 +72,13 @@ void TerminalRender::input_change(const std::string& new_input, const std::strin
 
 }
 
-std::string TerminalRender::get_input() {
+std::u8string TerminalRender::get_input() {
     return this->input_raw;
 }
 
 // Text rendering
 
-void TerminalRender::write(const std::string &text) {
+void TerminalRender::write(const std::u8string &text) {
 
     unsigned int lines_taken = calc_lines(strip_colors(text));
 
@@ -91,12 +92,12 @@ void TerminalRender::write(const std::string &text) {
     this->current_line += (signed) lines_taken - 1;
 
     this->cursor.y = current_line + 1;
-    this->cursor.x = this->line_buffer[current_line + 1].content_raw.length() == 0 ? 0 :
-                     this->line_buffer[current_line + 1].content_raw.length() + 1;
+    this->cursor.x = text_length(this->line_buffer[current_line + 1].content_raw) == 0 ? 0 :
+                     text_length(this->line_buffer[current_line + 1].content_raw);
 
 }
 
-void TerminalRender::write(const std::string &text, int line, bool cursor_follow) {
+void TerminalRender::write(const std::u8string &text, int line, bool cursor_follow) {
 
     int line_count = calc_lines(strip_colors(text));
 
@@ -122,15 +123,20 @@ void TerminalRender::write(const std::string &text, int line, bool cursor_follow
             this->window->render((float) x_offset, (float) y_offset, data.parts[j].c_str(),
                                  this->font, data.part_colors[j]);
 
-            x_offset += data.parts[j].length() * this->char_size;
+            x_offset += text_length(data.parts[j]) * this->char_size;
 
         }
 
     }
 
     if (cursor_follow) {
-        this->cursor.x = this->line_buffer[line + line_count - 1].content_raw.length();
-        this->cursor.y = line + line_count - 1;
+        if (line_count > 0) {
+            this->cursor.x = text_length(this->line_buffer[line + line_count - 1].content_raw);
+            this->cursor.y = line + line_count - 1;
+        } else {
+            this->move_cursor(0, this->cursor.y);
+            draw_cursor(true, true);
+        }
     }
 
     this->window->display();
@@ -167,9 +173,9 @@ void TerminalRender::refresh() {
 
 // Text utilities
 
-std::string TerminalRender::strip_colors(std::string text) {
+std::u8string TerminalRender::strip_colors(std::u8string text) {
 
-    if (text.empty()) return "";
+    if (text_length(text) == 0) return u8"";
 
     std::regex::flag_type regex_flag = std::regex_constants::icase | std::regex_constants::ECMAScript;
 
@@ -177,14 +183,16 @@ std::string TerminalRender::strip_colors(std::string text) {
 
     std::smatch matches;
 
-    std::regex_search(text, matches, regexp);
+    std::string converted = std::string(text.begin(), text.end());
 
-    std::istringstream iss(text);
+    std::regex_search(converted, matches, regexp);
+
+    std::istringstream iss(converted);
     std::string s;
 
     int curr_part = 0;
 
-    std::string string_from_parts;
+    std::u8string string_from_parts;
 
     while (getline(iss, s, ' ')) {
 
@@ -194,7 +202,7 @@ std::string TerminalRender::strip_colors(std::string text) {
 
             std::regex pattern("#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})");
 
-            s.replace(0, 1, "").replace(s.length() - 2, 1, "");
+            s.replace(0, 1, "").replace(text_length(std::u8string(s.begin(), s.end())) - 1, 1, "");
 
             std::smatch match;
 
@@ -202,19 +210,19 @@ std::string TerminalRender::strip_colors(std::string text) {
 
         }
 
-        string_from_parts += s + " ";
+        string_from_parts += std::u8string(s.begin(), s.end()) + u8" ";
 
     }
 
-    if (text[text.length() - 1] == ' ') string_from_parts += " ";
+    if (text[text_length(text) - 1] == ' ') string_from_parts += u8" ";
 
-    if (!string_from_parts.empty()) string_from_parts.pop_back();
+    if (text_length(string_from_parts) != 0) string_from_parts.pop_back();
 
     return string_from_parts;
 
 }
 
-std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
+std::vector<LineData> TerminalRender::parse_text(const std::u8string &text) {
 
     std::regex::flag_type regex_flag = std::regex_constants::icase | std::regex_constants::ECMAScript;
 
@@ -222,12 +230,11 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
     std::smatch matches;
 
-    std::regex_search(text, matches, regexp);
+    std::string converted = std::string(text.begin(), text.end());
 
-    std::istringstream iss(text);
-    std::string s;
+    std::regex_search(converted, matches, regexp);
 
-    std::vector<std::string> string_parts;
+    std::vector<std::u8string> string_parts;
     std::vector<SDL_Color> colors;
 
     int curr_part = 0;
@@ -235,9 +242,13 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
     string_parts.emplace_back();
     colors.emplace_back(this->default_color);
 
-    while (getline(iss, s, ' ')) {
+    std::vector<std::u8string> _split_string;
+    split_string(std::u8string(converted.begin(), converted.end()), _split_string);
 
-        if (!s.empty() && std::regex_match(s, matches, regexp)) {
+    for (auto & s : _split_string) {
+
+        std::string _temp = std::string(s.begin(), s.end());
+        if (!s.empty() && std::regex_match(_temp, matches, regexp)) {
 
             // std::cout << s << std::endl;
 
@@ -248,11 +259,13 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
             std::regex pattern("#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})");
 
-            s.replace(0, 1, "").replace(s.length() - 2, 1, "");
+            _temp.replace(0, 1, "").replace(text_length(std::u8string(_temp.begin(), _temp.end())) - 1, 1, "");
 
             std::smatch match;
 
-            if (std::regex_match(s, match, pattern)) {
+            colors[curr_part] = this->default_color;
+
+            if (std::regex_match(_temp, match, pattern)) {
 
                 Uint8 r = std::stoul(match[1].str(), nullptr, 16);
                 Uint8 g = std::stoul(match[2].str(), nullptr, 16);
@@ -262,19 +275,17 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
                 continue;
             }
 
-            colors[curr_part] = this->default_color;
-
             continue;
 
         }
 
-        string_parts[curr_part] += s + " ";
+        string_parts[curr_part] += std::u8string(_temp.begin(), _temp.end()) + u8" ";
 
     }
 
-    if (string_parts[curr_part].empty() ||
-        string_parts[curr_part][string_parts[curr_part].length() - 2] == ' ')
-        string_parts[curr_part] += " ";
+    if (text_length(string_parts[curr_part]) == 0 ||
+        string_parts[curr_part][text_length(string_parts[curr_part]) - 1] == ' ')
+        string_parts[curr_part] += u8" ";
 
     if (!string_parts[curr_part].empty()) string_parts[curr_part].pop_back();
 
@@ -284,7 +295,7 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
     // Dividing parts into lines
 
-    std::string stripped = strip_colors(text);
+    std::u8string stripped = strip_colors(text);
 
     if (calc_lines(stripped) == 1) {
         line_data.emplace_back(LineData{
@@ -299,24 +310,24 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
 
     for (int i = 0; i < string_parts.size(); i++) {
 
-        std::string part = string_parts[i];
+        std::u8string part = string_parts[i];
         SDL_Color part_color = colors[i];
 
         line_data.emplace_back();
 
-        if (len + part.length() > this->cols) {
+        if (len + text_length(part) > this->cols) {
 
-            while (len + part.length() > this->cols) {
+            while (len + text_length(part) > this->cols) {
 
                 line_data.emplace_back();
 
-                std::string sub = part.substr(0, this->cols - len);
+                std::u8string sub = part.substr(0, this->cols - len);
 
                 line_data[line_index].parts.emplace_back(sub);
                 line_data[line_index].part_colors.emplace_back(part_color);
                 line_data[line_index].content_raw += sub;
 
-                part.replace(0, this->cols - len, "");
+                part.replace(0, this->cols - len, u8"");
 
                 len = 0;
                 line_index++;
@@ -326,18 +337,44 @@ std::vector<LineData> TerminalRender::parse_text(const std::string &text) {
         }
 
         if (!part.empty()) {
-            std::cout << strip_colors(part) << std::endl;
             line_data[line_index].content_raw += strip_colors(part);
             line_data[line_index].parts.emplace_back(part);
             line_data[line_index].part_colors.emplace_back(part_color);
         }
 
-        len += part.length();
+        len += text_length(part);
 
     }
 
     return line_data;
 
+}
+
+void TerminalRender::split_string(std::u8string s, std::vector<std::u8string> &v) {
+
+    std::u8string temp;
+
+    for (char8_t i : s) {
+
+        if (i == ' ') {
+            v.push_back(temp);
+            temp = u8"";
+        } else {
+            temp.push_back(i);
+        }
+
+    }
+
+    v.push_back(temp);
+
+}
+
+unsigned int TerminalRender::text_length(const std::u8string &text) {
+    unsigned int count = 0;
+    for (auto &c : text)
+        if ((c & 0b1100'0000) != 0b1000'0000) // Not a trailing byte
+            ++count;
+    return count;
 }
 
 // Cursor
@@ -385,7 +422,7 @@ void TerminalRender::draw_cursor(bool show, bool force_update) {
 //                                                   this->line_buffer[cursor.y].content_raw.substr(cursor.x, 1).c_str() :
 //                                                   " ", this->font, this->default_color);
 
-        this->window->render((float) x, (float) y, "_", this->font, this->default_color);
+        this->window->render((float) x, (float) y, u8"_", this->font, this->default_color);
 
         this->cursor_shown = true;
 
@@ -395,9 +432,9 @@ void TerminalRender::draw_cursor(bool show, bool force_update) {
 
         this->window->renderRect(&rect, {0x0, 0x0, 0x0});
 
-        this->window->render((float) x, (float) y, this->line_buffer[cursor.y].content_raw.length() > cursor.x
+        this->window->render((float) x, (float) y, text_length(this->line_buffer[cursor.y].content_raw) > cursor.x
                                                    ? this->line_buffer[cursor.y].content_raw.substr(cursor.x, 1).c_str()
-                                                   : " ", this->font, this->default_color);
+                                                   : u8" ", this->font, this->default_color);
 
         this->cursor_shown = false;
 
@@ -409,12 +446,12 @@ void TerminalRender::draw_cursor(bool show, bool force_update) {
 
 // Line utilities
 
-unsigned int TerminalRender::calc_lines(const std::string &text) const {
-    return std::ceil((float) text.length() / (float) this->cols);
+unsigned int TerminalRender::calc_lines(const std::u8string &text) const {
+    return std::ceil((float) text_length(text) / (float) cols);
 }
 
-bool TerminalRender::too_long(const std::string &text) {
-    return text.length() > this->cols;
+bool TerminalRender::too_long(const std::u8string &text) const {
+    return text_length(text) > cols;
 }
 
 void TerminalRender::shift() {}

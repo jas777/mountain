@@ -12,8 +12,8 @@
 #include "RenderWindow.h"
 
 struct LineData {
-    std::string content_raw;
-    std::vector<std::string> parts;
+    std::u8string content_raw;
+    std::vector<std::u8string> parts;
     std::vector<SDL_Color> part_colors;
 };
 
@@ -30,8 +30,8 @@ private:
 
     TTF_Font *font;
     std::vector<LineData> line_buffer;
-    std::string input_raw;
-    std::string current_path = "some/debug/path";
+    std::u8string input_raw;
+    std::u8string current_path = u8"some/debug/path";
 
     SDL_Color default_color;
 
@@ -53,19 +53,19 @@ public:
 
     void input_submit();
 
-    void input_add(std::string text);
+    void input_add(std::u8string text);
 
-    void input_set(std::string text);
+    void input_set(std::u8string text);
 
-    void input_change(const std::string& new_input, const std::string& old_input);
+    void input_change(const std::u8string &new_input, const std::u8string &old_input);
 
-    std::string get_input();
+    std::u8string get_input();
 
     // Text rendering
 
-    void write(const std::string &text);
+    void write(const std::u8string &text);
 
-    void write(const std::string &text, int line, bool cursor_follow);
+    void write(const std::u8string &text, int line, bool cursor_follow);
 
     void clear_line(int line);
 
@@ -73,27 +73,30 @@ public:
 
     void refresh();
 
+    // Text utilities
+
+    static std::u8string strip_colors(std::u8string text);
+
+    std::vector<LineData> parse_text(const std::u8string &text);
+
+    static unsigned int text_length(const std::u8string &text);
+
+    static void split_string(std::u8string s, std::vector<std::u8string> &v);
+
     // Cursor
 
     void draw_cursor(bool show, bool force_update);
 
     void move_cursor(unsigned int x, unsigned int y);
 
-    // Text utilities
-
-    static std::string strip_colors(std::string text);
-
-    std::vector<LineData> parse_text(const std::string &text);
-
     // Line utilities
 
-    unsigned int calc_lines(const std::string& text) const;
+    [[nodiscard]] unsigned int calc_lines(const std::u8string &text) const;
 
-    bool too_long(const std::string &text);
+    bool too_long(const std::u8string &text) const;
 
     void shift();
 
 };
-
 
 #endif //MOUNTAIN_TERMINALRENDER_H_NEW
